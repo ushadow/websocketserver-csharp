@@ -89,9 +89,6 @@ namespace WebSocketServer {
         try {
           // send the string
           ConnectionSocket.Send(Encoding.UTF8.GetBytes(str));
-          /*
-          writer.Write(str);
-          writer.Flush();*/
         }
         catch {
           if (Disconnected != null)
@@ -102,7 +99,7 @@ namespace WebSocketServer {
 
     private Byte[] Decode(Byte[] dataBuffer, Int32 bytesReceived) {
       var secondByte = dataBuffer[1];
-      Int32 length = secondByte & (Byte)127;
+      Int32 length = secondByte & (Byte) 127;
       var indexFirstMask = 2;
       if (length == 126) {
         indexFirstMask = 4;
