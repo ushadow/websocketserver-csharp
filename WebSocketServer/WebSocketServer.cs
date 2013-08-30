@@ -7,7 +7,7 @@ using System.Security.Cryptography;
 
 using Common.Logging;
 
-namespace WebSocketServer {
+namespace WebSocket {
 
   public class ClientConnectedEventArgs {
     public WebSocketConnection Client { get; private set; }
@@ -37,6 +37,9 @@ namespace WebSocketServer {
       tcpListener = new TcpListener(IPAddress.Parse(ipAddress), port);
     }
 
+    /// <summary>
+    /// Starts the server to listen for client connection asynchronously.
+    /// </summary>
     public void Start() {
       try {
         tcpListener.Start();
@@ -60,15 +63,19 @@ namespace WebSocketServer {
     }
 
     private void OnClientConnect(IAsyncResult asyn) {
-      var client = tcpListener.EndAcceptTcpClient(asyn);
-      Console.WriteLine("New connection from {0}", client.Client.LocalEndPoint);
-      ShakeHands(client);
+      try {
+        var client = tcpListener.EndAcceptTcpClient(asyn);
+        Console.WriteLine("New connection from {0}", client.Client.LocalEndPoint);
+        ShakeHands(client);
 
-      var clientConnection = new WebSocketConnection(client.Client);
-      clientConnection.Disconnected += new WebSocketDisconnectedEventHandler(OnClientDisconnect);
-      if (ClientConnected != null)
-        ClientConnected(this, new ClientConnectedEventArgs(clientConnection));
-      ListenForClients();
+        var clientConnection = new WebSocketConnection(client.Client);
+        clientConnection.Disconnected += new WebSocketDisconnectedEventHandler(OnClientDisconnect);
+        if (ClientConnected != null)
+          ClientConnected(this, new ClientConnectedEventArgs(clientConnection));
+        ListenForClients();
+      } catch (ObjectDisposedException ode) {
+        log.Info(ode);
+      }
     }
 
     private void OnClientDisconnect(WebSocketConnection sender, EventArgs e) {

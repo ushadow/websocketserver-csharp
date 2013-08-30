@@ -6,7 +6,7 @@ using System.Linq;
 
 using Common.Logging;
 
-namespace WebSocketServer {
+namespace WebSocket {
   public class DataReceivedEventArgs {
     public int Size { get; private set; }
     public string Data { get; private set; }
@@ -50,7 +50,7 @@ namespace WebSocketServer {
     /// constructor
     /// </summary>
     /// <param name="socket">The socket on which to esablish the connection</param>
-    public WebSocketConnection(Socket socket) : this(socket, 255) {}
+    public WebSocketConnection(Socket socket) : this(socket, 255) { }
 
     /// <summary>
     /// constructor
@@ -88,23 +88,81 @@ namespace WebSocketServer {
       if (ConnectionSocket.Connected) {
         try {
           // send the string
-          ConnectionSocket.Send(Encoding.UTF8.GetBytes(str));
-        }
-        catch {
+          ConnectionSocket.Send(Encode(str));
+        } catch {
           if (Disconnected != null)
             Disconnected(this, EventArgs.Empty);
         }
       }
     }
 
+    /// <summary>
+    /// First byte is 129 for a text frame.
+    /// The second byte has its first bit set to 0 because we do not encode the data.
+    /// </summary>
+    /// <param name="message"></param>
+    /// <returns></returns>
+    private Byte[] Encode(String message) {
+      var bytesRaw = Encoding.UTF8.GetBytes(message);
+      var indexStartRawData = -1;
+      if (bytesRaw.Length <= 125) {
+        indexStartRawData = 2;
+      } else if (bytesRaw.Length >= 126 && bytesRaw.Length <= 65535) {
+        indexStartRawData = 4;
+      } else {
+        indexStartRawData = 10;
+      }
+      var bytesFormatted = new Byte[bytesRaw.Length + indexStartRawData];
+      bytesFormatted[0] = 129;
+      switch (indexStartRawData) {
+        case 2:
+          bytesFormatted[1] = (Byte)bytesRaw.Length;
+          break;
+        case 4:
+          bytesFormatted[1] = 126;
+          Int2Byte(bytesFormatted, bytesRaw.Length, 2, 2);
+          break;
+        case 10:
+          bytesFormatted[1] = 127;
+          Int2Byte(bytesFormatted, bytesRaw.Length, 2, 8);
+          break;
+      }
+      Array.Copy(bytesRaw, 0, bytesFormatted, indexStartRawData, bytesRaw.Length);
+      return bytesFormatted;
+    }
+
+    private void Int2Byte(Byte[] arr, Int32 num, Int32 startIndex, Int32 numBytes) {
+      for (Int32 i = 0; i < numBytes; i++) {
+        arr[startIndex + i] = (Byte) ((num >> 8 * (numBytes - i - 1)) & 0xFF);
+      }
+    }
+
+    /// <summary>
+    /// Web socket frame format from client:
+    /// <list type="bullet">
+    ///   <item>
+    ///     <description>one byte which contains the type of data. Text type is 129.</description>  
+    ///   </item>
+    ///   <item>
+    ///     <description>one byte which contains the length of the payload.</description>
+    ///   </item>
+    ///   <item>
+    ///     <description>either 2 or 8 additional bytes if length does not fit in the 2nd byte.
+    ///     </description>
+    ///   </item>
+    /// </list>
+    /// </summary>
+    /// <param name="dataBuffer"></param>
+    /// <param name="bytesReceived"></param>
+    /// <returns></returns>
     private Byte[] Decode(Byte[] dataBuffer, Int32 bytesReceived) {
       var secondByte = dataBuffer[1];
-      Int32 length = secondByte & (Byte) 127;
-      var indexFirstMask = 2;
+      // 
+      Int32 length = secondByte & (Byte)127;
+      var indexFirstMask = 2; // If not a special case.
       if (length == 126) {
         indexFirstMask = 4;
-      }
-      else if (length == 127) {
+      } else if (length == 127) {
         indexFirstMask = 10;
       }
 
@@ -132,8 +190,7 @@ namespace WebSocketServer {
             Disconnected(this, EventArgs.Empty);
           }
         }
-      }
-      catch (Exception e) {
+      } catch (Exception e) {
         log.Error(e);
         Dispose();
       }
