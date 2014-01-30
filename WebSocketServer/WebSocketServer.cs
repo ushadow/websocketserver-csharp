@@ -16,17 +16,18 @@ namespace WebSocket {
     }
   }
 
-  public delegate void ClientConnectedEventHandler(WebSocketServer sender, 
+  public delegate void ClientConnectedEventHandler(WebSocketServer sender,
       ClientConnectedEventArgs e);
 
   public class WebSocketServer {
-    private static readonly ILog log = LogManager.GetCurrentClassLogger();
+    private static readonly ILog Log = LogManager.GetCurrentClassLogger();
     private static readonly String MagicString = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
     private static readonly String SocketKeyPattern = "Sec-WebSocket-Key: (.*)";
 
     public event ClientConnectedEventHandler ClientConnected;
 
     private TcpListener tcpListener;
+    private bool active = false;
 
     /// <summary>
     /// Creates a WebSocket server instance.
@@ -38,34 +39,46 @@ namespace WebSocket {
     }
 
     /// <summary>
-    /// Starts the server to listen for client connection asynchronously.
+    /// Starts the server to listen for client connection asynchronously. Does nothing is the 
+    /// server had already been started.
     /// </summary>
     public void Start() {
       try {
-        tcpListener.Start();
-        Console.WriteLine("WebSocketServer started on {0}", tcpListener.LocalEndpoint);
-        ListenForClients();
-      }
-      catch (SocketException se) {
-        log.Error(se.StackTrace);
+        if (!active) {
+          tcpListener.Start();
+          Log.InfoFormat("WebSocketServer started on {0}", tcpListener.LocalEndpoint);
+          ListenForClients();
+          active = true;
+        } else {
+          Log.InfoFormat("WebSocketServer has already started on {0}", tcpListener.LocalEndpoint);
+        }
+      } catch (SocketException se) {
+        Log.Error(se.Message);
       }
     }
 
-    public void Stop() { tcpListener.Stop(); }
+    /// <summary>
+    /// Stops listening for client connection.
+    /// </summary>
+    public void Stop() {
+      if (active) {
+        tcpListener.Stop();
+        active = false;
+      }
+    }
 
     private void ListenForClients() {
       try {
         tcpListener.BeginAcceptTcpClient(new AsyncCallback(OnClientConnect), null);
-      }
-      catch (ObjectDisposedException ode) {
-        log.Info(ode.ToString());
+      } catch (ObjectDisposedException ode) {
+        Log.Info(ode.Message);
       }
     }
 
     private void OnClientConnect(IAsyncResult asyn) {
       try {
         var client = tcpListener.EndAcceptTcpClient(asyn);
-        Console.WriteLine("New connection from {0}", client.Client.LocalEndPoint);
+        Log.InfoFormat("New connection from {0}", client.Client.RemoteEndPoint);
         ShakeHands(client);
 
         var clientConnection = new WebSocketConnection(client.Client);
@@ -74,7 +87,7 @@ namespace WebSocket {
           ClientConnected(this, new ClientConnectedEventArgs(clientConnection));
         ListenForClients();
       } catch (ObjectDisposedException ode) {
-        log.Info(ode);
+        Log.Info(ode.Message);
       }
     }
 

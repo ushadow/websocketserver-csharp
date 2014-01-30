@@ -22,7 +22,7 @@ namespace WebSocket {
   public class WebSocketConnection : IDisposable {
 
     #region Private members
-    private static readonly ILog log = LogManager.GetCurrentClassLogger();
+    private static readonly ILog Log = LogManager.GetCurrentClassLogger();
     private static readonly Int32 NumMaskBytes = 4;
 
     private byte[] dataBuffer;  // buffer to hold the data we are reading
@@ -156,8 +156,10 @@ namespace WebSocket {
     /// <param name="bytesReceived"></param>
     /// <returns></returns>
     private Byte[] Decode(Byte[] dataBuffer, Int32 bytesReceived) {
+      Log.Debug(dataBuffer.Length);
+      Log.DebugFormat("bytes recived = {0}", bytesReceived);
       var secondByte = dataBuffer[1];
-      // 
+       
       Int32 length = secondByte & (Byte)127;
       var indexFirstMask = 2; // If not a special case.
       if (length == 126) {
@@ -165,12 +167,12 @@ namespace WebSocket {
       } else if (length == 127) {
         indexFirstMask = 10;
       }
-
+      Log.DebugFormat("Index of first mask = {0}", indexFirstMask);
       var mask = new ArraySegment<byte>(dataBuffer, indexFirstMask, NumMaskBytes);
       var indexFirstDataByte = indexFirstMask + NumMaskBytes;
       var decoded = new Byte[bytesReceived - indexFirstDataByte];
       for (Int32 i = indexFirstDataByte, j = 0; i < bytesReceived; i++, j++) {
-        decoded[i] = (Byte)(dataBuffer[i] ^ mask.ElementAt<Byte>(j % NumMaskBytes));
+        decoded[j] = (Byte)(dataBuffer[i] ^ mask.ElementAt<Byte>(j % NumMaskBytes));
       }
       return decoded;
     }
@@ -191,7 +193,7 @@ namespace WebSocket {
           }
         }
       } catch (Exception e) {
-        log.Error(e);
+        Log.Error(e);
         Dispose();
       }
     }
