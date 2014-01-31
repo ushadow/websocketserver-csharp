@@ -193,7 +193,7 @@ namespace WebSocket {
           }
         }
       } catch (Exception e) {
-        Log.Error(e);
+        Log.Info(e.Message);
         Dispose();
       }
     }
